@@ -1,10 +1,9 @@
 #include <Arduino.h>
-#include <ArduinoJson.h> // IMPORTANTE: Instale esta biblioteca
+#include <ArduinoJson.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <cstdlib>
 
-// --- CONFIGURAÇÃO ---
 const char *ssid = "";
 const char *password = "";
 
@@ -12,199 +11,250 @@ const char *mqtt_server = "";
 const char *mqtt_user = "";
 const char *mqtt_password = "";
 
-const char *topic_dashboard = "teste/arduino"; // Tópico que o JS escuta
-const char *client_id = "ArduinoClient_01";
-
-const int lane_1_ir_1_sensor_pin = 22;
-const int lane_1_ir_2_sensor_pin = 21;
-const int lane_1_ir_3_sensor_pin = 23;
-
-const int lane_2_ir_1_sensor_pin = 34;
-const int lane_2_ir_2_sensor_pin = 35;
-const int lane_2_ir_3_sensor_pin = 32;
+const char *topic_dashboard = "teste/arduino";
+const char *client_id = "TrafficController_ESP32";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-unsigned long lastPublishTime = 0;
-const long publishInterval = 1000;
+const int PIN_A_S1 = 23;
+const int PIN_A_S2 = 22;
+const int PIN_A_S3 = 21;
 
-unsigned long lastLightChange = 0;
-int trafficLightState = 0;
-const long lightInterval = 5000;
-String lastOpenState = "";
+const int PIN_B_S1 = 34; // inverted
+const int PIN_B_S2 = 35;
+const int PIN_B_S3 = 32;
 
-struct laneSensorConfig {
-  int ir_sensor_pins[3];
-};
+const int PIN_BUTTON_A = 14;
+const int PIN_BUTTON_B = 12;
 
-void reconnect() {
-  if (!client.connected()) {
-    Serial.print("Tentando conexão MQTT...");
-    if (client.connect(client_id, mqtt_user, mqtt_password)) {
-      Serial.println("Conectado!");
-    } else {
-      Serial.print("Falha, rc=");
-      Serial.print(client.state());
-      Serial.println(" Tentando novamente em 2s.");
-      delay(2000);
-    }
-  }
-}
+const long TEMPO_PADRAO = 10000;
+const long TEMPO_AMARELO = 2000;
+const long TEMPO_SEGURANCA = 1000;
+
+enum Faixa { FAIXA_A, FAIXA_B, NENHUMA };
+Faixa faixaVerdeAtual = NENHUMA;
+
+String estadoString = "S1_VERDE"; // Estado atual para enviar no JSON
+int trafegoA = 0;                 // 0 a 3
+int trafegoB = 0;                 // 0 a 3
 
 void setup_wifi() {
-  Serial.print("Conectando-se a ");
+  delay(10);
+  Serial.print("Conecting to: ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nWiFi conectado!");
+  Serial.println("\nWiFi connected!!");
 }
 
-String calculateTrafficLevel(laneSensorConfig lane) {
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Trying MQTT connection...");
+    if (client.connect(client_id, mqtt_user, mqtt_password)) {
+      Serial.println("Connected!");
+    } else {
+      Serial.print("Failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" Trying again in 2s.");
+      delay(2000);
+    }
+  }
+}
 
+bool checkIR(int pin, bool inverted = false) {
+  return digitalRead(pin) == (inverted ? LOW : HIGH);
+}
+
+int calculateTrafficLevel(int p1, int p2, int p3, int invertedIRPin = -1) {
   int cnt = 0;
-  if (lane.ir_sensor_pins[0] == HIGH)
+  if (checkIR(p1, invertedIRPin == p1))
     cnt++;
-  if (lane.ir_sensor_pins[1] == HIGH)
+  if (checkIR(p2, invertedIRPin == p2))
     cnt++;
-  if (lane.ir_sensor_pins[2] == HIGH)
+  if (checkIR(p3, invertedIRPin == p3))
     cnt++;
+  return cnt;
+}
 
-  if (cnt == 0)
+void updateSensorInformation() {
+  trafegoA = calculateTrafficLevel(PIN_A_S1, PIN_A_S2, PIN_A_S3);
+  trafegoB = calculateTrafficLevel(PIN_B_S1, PIN_B_S2, PIN_B_S3, PIN_B_S1);
+}
+
+String translateTrafficLevel(int nivel) {
+  if (nivel == 0)
     return "LIVRE";
-  if (cnt == 1)
+  if (nivel == 1)
     return "LEVE";
-  if (cnt == 2)
+  if (nivel == 2)
     return "MODERADO";
-  if (cnt >= 3)
-    return "INTENSO";
-
-  return "LIVRE";
+  return "INTENSO";
 }
 
-String handleTrafficLight(laneSensorConfig lane1, laneSensorConfig lane2) {
-  // unsigned long now = millis();
+void sendMQTTState() {
+  if (!client.connected())
+    reconnect();
 
-  // if (now - lastLightChange > lightInterval) {
-  //   trafficLightState++;
-  //   if (trafficLightState > 3) trafficLightState = 0;
-  //   lastLightChange = now;
-  // }
+  StaticJsonDocument<256> doc;
 
-  // switch (trafficLightState) {
-  //   case 0: return "S1_VERDE";   // S1 Verde, S2 Vermelho
-  //   case 1: return "S1_AMARELO"; // S1 Amarelo, S2 Vermelho
-  //   case 2: return "S2_VERDE";   // S1 Vermelho, S2 Verde
-  //   case 3: return "S2_AMARELO"; // S1 Vermelho, S2 Amarelo
-  //   default: return "S1_VERDE";
-  // }
+  doc["estado"] = estadoString;
 
-  // int cnt = 0;
-  // if (lane1.ir_sensor_pins[0] == HIGH) cnt++;
-  // if (lane1.ir_sensor_pins[1] == HIGH) cnt++;
-  // if (lane1.ir_sensor_pins[2] == HIGH) cnt++;
-
-  // int cnt_opp = 0;
-  // if (lane2.ir_sensor_pins[0] == HIGH) cnt_opp++;
-
-  // Serial.println(cnt);
-  // Serial.println(cnt_opp);
-
-  // if (cnt == 3 && cnt_opp == 0) return "S1_VERDE";
-  // if (cnt == 2 && cnt_opp == 0) return "S1_VERDE";
-  // if (cnt == 1 && cnt_opp == 0) return "S1_AMARELO";
-
-  // return "S2_VERDE";
-
-  // String lane1_transit_level = calculateTrafficLevel(lane1);
-  // String lane2_transit_level = calculateTrafficLevel(lane2);
-
-  // if (lane1_transit_level == lane2_transit_level) {
-  //   lastOpenState = random(0, 2) == 0 ? "S1_VERDE" : "S2_VERDE";
-  // } else {
-    
-  // }
-
-  // return lastOpenState;
-  return "S2_VERDE";
-}
-
-void publishData(laneSensorConfig lane1, laneSensorConfig lane2) {
-  StaticJsonDocument<200> doc;
-
-  doc["estado"] = handleTrafficLight(lane1, lane2); // Ex: "S1_VERDE"
-  doc["transito"] = calculateTrafficLevel(lane1);   // Ex: "INTENSO"
+  if (faixaVerdeAtual == FAIXA_A) {
+    doc["transito"] = translateTrafficLevel(trafegoA);
+  } else {
+    doc["transito"] = translateTrafficLevel(trafegoB);
+  }
 
   doc["ambulancia"] = false;
   doc["pedestre"] = false;
 
   char buffer[256];
   serializeJson(doc, buffer);
-
   client.publish(topic_dashboard, buffer);
+}
 
-  Serial.print("JSON Enviado: ");
-  Serial.println(buffer);
+void waitMQTT(long tempoMs) {
+  long tempoInicio = millis();
+  while (millis() - tempoInicio < tempoMs) {
+    client.loop();
+    delay(10);
+  }
+}
+
+void defineTrafficLights(Faixa verde, Faixa amarelo, bool vermelhoTotal) {
+  if (vermelhoTotal) {
+    estadoString = "VERMELHO_TOTAL";
+  } else if (amarelo == FAIXA_A) {
+    estadoString = "S1_AMARELO";
+  } else if (amarelo == FAIXA_B) {
+    estadoString = "S2_AMARELO";
+  } else if (verde == FAIXA_A) {
+    estadoString = "S1_VERDE";
+  } else if (verde == FAIXA_B) {
+    estadoString = "S2_VERDE";
+  }
+
+  sendMQTTState();
+}
+
+void closeCurrentLane() {
+  if (faixaVerdeAtual == NENHUMA)
+    return;
+
+  defineTrafficLights(NENHUMA, faixaVerdeAtual, false);
+  waitMQTT(TEMPO_AMARELO);
+
+  defineTrafficLights(NENHUMA, NENHUMA, true);
+  waitMQTT(TEMPO_SEGURANCA);
 }
 
 void setup() {
   Serial.begin(9600);
 
-  // lane 1
-  pinMode(lane_1_ir_1_sensor_pin, INPUT);
-  pinMode(lane_1_ir_2_sensor_pin, INPUT);
-  pinMode(lane_1_ir_3_sensor_pin, INPUT);
-
-  // lane 2
-  pinMode(lane_2_ir_1_sensor_pin, INPUT);
-  pinMode(lane_2_ir_2_sensor_pin, INPUT);
-  pinMode(lane_2_ir_3_sensor_pin, INPUT);
+  pinMode(PIN_A_S1, INPUT);
+  pinMode(PIN_A_S2, INPUT);
+  pinMode(PIN_A_S3, INPUT);
+  pinMode(PIN_B_S1, INPUT);
+  pinMode(PIN_B_S2, INPUT);
+  pinMode(PIN_B_S3, INPUT);
+  
+  pinMode(PIN_BUTTON_A, INPUT_PULLUP); 
+  pinMode(PIN_BUTTON_B, INPUT_PULLUP);
 
   setup_wifi();
   client.setServer(mqtt_server, 1883);
+
+  updateSensorInformation();
+
+  if (trafegoA == trafegoB) {
+    faixaVerdeAtual = random(0, 2) == 0 ? FAIXA_A : FAIXA_B;
+  } else {
+    faixaVerdeAtual = (trafegoA > trafegoB) ? FAIXA_A : FAIXA_B;
+  }
+
+  defineTrafficLights(faixaVerdeAtual, NENHUMA, false);
 }
 
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
   client.loop();
 
-  unsigned long now = millis();
+  long tempoDecorrido = 0;
 
-  if (now - lastPublishTime >= publishInterval) {
-    lastPublishTime = now;
+  defineTrafficLights(faixaVerdeAtual, NENHUMA, false);
 
-    int lane_1_ir_1 = digitalRead(lane_1_ir_1_sensor_pin);
-    int lane_1_ir_2 = digitalRead(lane_1_ir_2_sensor_pin);
-    int lane_1_ir_3 = digitalRead(lane_1_ir_3_sensor_pin);
+  while (tempoDecorrido < TEMPO_PADRAO) {
+    waitMQTT(1000);
+    tempoDecorrido += 1000;
+    
+    int buttonValA = digitalRead(PIN_BUTTON_A);
+    Serial.println("Button A value: " + String(buttonValA));
+    updateSensorInformation();
+    if (buttonValA == LOW) {
+      closeCurrentLane();
 
-    laneSensorConfig lane1 = {
-        .ir_sensor_pins = {lane_1_ir_1, lane_1_ir_2, lane_1_ir_3}};
+      int trafegoOposto = trafegoB;
 
-    int lane_2_ir_1 = digitalRead(lane_2_ir_1_sensor_pin);
-    int lane_2_ir_2 = digitalRead(lane_2_ir_2_sensor_pin);
-    int lane_2_ir_3 = digitalRead(lane_2_ir_3_sensor_pin);
+      if (trafegoOposto > 0) {
+        Faixa faixaOposta = FAIXA_B;
+        defineTrafficLights(faixaOposta, NENHUMA, false);
+        waitMQTT(TEMPO_PADRAO / 2);
+        defineTrafficLights(NENHUMA, faixaOposta, false);
+        waitMQTT(TEMPO_AMARELO);
+      }
 
-    laneSensorConfig lane2 = {.ir_sensor_pins = {lane_2_ir_1, lane_2_ir_2, lane_2_ir_3}};
+      defineTrafficLights(faixaVerdeAtual, NENHUMA, false);
+      tempoDecorrido = 0;
+      continue;
+    }
 
-    Serial.print("Lane 1 Sensors: ");
-    Serial.print(lane_1_ir_1);
-    Serial.print(", ");
-    Serial.print(lane_1_ir_2);
-    Serial.print(", ");
-    Serial.println(lane_1_ir_3);
+   /* int buttonValB = digitalRead(PIN_BUTTON_B);
+    updateSensorInformation();
+    if (buttonValB == LOW) {
+      closeCurrentLane();
+      int trafegoOposto = trafegoA;
+      if (trafegoOposto > 0) {
+        Faixa faixaOposta = FAIXA_A;
+        defineTrafficLights(faixaOposta, NENHUMA, false);
+        waitMQTT(TEMPO_PADRAO / 2);
+        defineTrafficLights(NENHUMA, faixaOposta, false);
+        waitMQTT(TEMPO_AMARELO);
+      }
+      defineTrafficLights(faixaVerdeAtual, NENHUMA, false);
+      tempoDecorrido = 0;
+      continue;
+    }*/
 
-    Serial.print("Lane 2 Sensors: ");
-    Serial.print(lane_2_ir_1);
-    Serial.print(", ");
-    Serial.print(lane_2_ir_2);
-    Serial.print(", ");
-    Serial.println(lane_2_ir_3);
+    sendMQTTState();
+    if (abs(trafegoA - trafegoB) < 2 && trafegoA > 0 && trafegoB > 0) {
+      Serial.println(
+          "-> Equilibrio detectado. Encerrando ciclo verde antecipadamente.");
+      break;
+    }
+  }
 
-    publishData(lane1, lane2);
+  updateSensorInformation();
+  Faixa faixaOposta = (faixaVerdeAtual == FAIXA_A) ? FAIXA_B : FAIXA_A;
+  int qtdOposta = (faixaVerdeAtual == FAIXA_A) ? trafegoB : trafegoA;
+  int qtdAtual = (faixaVerdeAtual == FAIXA_A) ? trafegoA : trafegoB;
+
+  Faixa proximaFaixa = faixaOposta;
+
+  if (qtdOposta == 0 && qtdAtual > 0 || (qtdAtual == 0 && qtdOposta == 0)) {
+    proximaFaixa = faixaVerdeAtual;
+    Serial.println("Decisao: Oposta vazia. MANTENDO ATUAL.");
+  } else {
+    Serial.println("Decisao: TROCANDO de faixa.");
+  }
+
+  if (proximaFaixa != faixaVerdeAtual) {
+    closeCurrentLane();
+    faixaVerdeAtual = proximaFaixa;
+    defineTrafficLights(faixaVerdeAtual, NENHUMA, false);
+  } else {
+    Serial.println(">>> Sinal continua VERDE na mesma faixa <<<");
   }
 }

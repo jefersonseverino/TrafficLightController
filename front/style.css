@@ -1,0 +1,102 @@
+:root {
+    --pcr-blue: #005492;
+    --pcr-light: #0093d9;
+    --pcr-gold: #ffcc00;
+    --bg: #f4f6f8;
+    --white: #ffffff;
+    --red: #ff4d4d;
+    --yellow: #ffcc00;
+    --green: #2ecc71;
+}
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background-color: var(--bg);
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    background: var(--pcr-blue);
+    color: white;
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+main {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 20px;
+    padding: 20px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.content-left {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+}
+
+.card {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+/* Localize e substitua ou adicione estas classes no seu style.css */
+
+.chart-container {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    min-height: 450px; /* Aumentamos a altura mínima */
+    position: relative;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+/* Garante que o canvas ocupe todo o espaço do container */
+#mainChart {
+    width: 100% !important;
+    height: 400px !important; 
+}
+
+/* Estilo para o texto de status não ficar 'quebrado' */
+.status-text {
+    font-size: 1.4rem;
+    font-weight: 800;
+    min-width: 120px;
+    text-align: center;
+}
+
+/* Semáforos */
+.traffic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.road-name { font-weight: bold; color: var(--pcr-blue); border-bottom: 2px solid #eee; margin-bottom: 15px; }
+.traffic-ui { display: flex; justify-content: space-around; align-items: center; }
+.tl-box { background: #222; padding: 10px; border-radius: 30px; display: flex; flex-direction: column; gap: 10px; }
+.light { width: 35px; height: 35px; border-radius: 50%; background: #444; }
+.light.active.red { background: var(--red); box-shadow: 0 0 15px var(--red); }
+.light.active.yellow { background: var(--yellow); box-shadow: 0 0 15px var(--yellow); }
+.light.active.green { background: var(--green); box-shadow: 0 0 15px var(--green); }
+
+/* Relatório */
+.report-panel { background: linear-gradient(135deg, var(--pcr-blue), var(--pcr-light)); color: white; }
+.report-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 15px 0; }
+.rep-item { background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; text-align: center; }
+.rep-item span { display: block; font-size: 1.3rem; font-weight: bold; }
+.btn-export { background: var(--pcr-gold); border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+.btn-export:hover { background: #e6b800; }
+
+/* Logs */
+.log-sidebar { background: var(--white); border-left: 1px solid #ddd; display: flex; flex-direction: column; }
+.log-header { padding: 15px; font-weight: bold; background: #eee; }
+#log-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; font-size: 0.85rem; }
+#log-list li { padding: 10px 15px; border-bottom: 1px solid #f9f9f9; }

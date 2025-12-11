@@ -3,343 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Traffic Control - Dashboard</title>
+    <title>CTTU - Monitoramento de Tráfego</title>
+    
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --bg-dark: #1a1a2e;
-            --panel-bg: #16213e;
-            --highlight: #0f3460;
-            --text-main: #e94560;
-            --text-light: #f1f1f1;
-            --traffic-off: #333;
-            --red-on: #ff4444;
-            --yellow-on: #ffcc00;
-            --green-on: #00cc66;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-light);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            box-sizing: border-box;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--highlight);
-            margin-bottom: 20px;
-        }
-
-        .status-badge {
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: bold;
-        }
-        .status-online { background-color: var(--green-on); color: #000; }
-        .status-offline { background-color: var(--red-on); color: #fff; }
-
-        .main-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-            flex: 1;
-        }
-
-        /* Visualização do Cruzamento */
-        .intersection-card {
-            background-color: var(--panel-bg);
-            border-radius: 15px;
-            padding: 20px;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-
-        .traffic-light-container {
-            display: flex;
-            gap: 50px;
-            margin-bottom: 30px;
-        }
-
-        .traffic-light {
-            background: #000;
-            padding: 15px;
-            border-radius: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            width: 60px;
-            border: 2px solid #444;
-        }
-
-        .light {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background-color: var(--traffic-off);
-            transition: background-color 0.3s, box-shadow 0.3s;
-        }
-
-        .light.red.active { background-color: var(--red-on); box-shadow: 0 0 20px var(--red-on); }
-        .light.yellow.active { background-color: var(--yellow-on); box-shadow: 0 0 20px var(--yellow-on); }
-        .light.green.active { background-color: var(--green-on); box-shadow: 0 0 20px var(--green-on); }
-
-        .street-label {
-            text-align: center;
-            margin-bottom: 10px;
-            font-weight: bold;
-            color: #888;
-        }
-
-        /* Cards de Sensores */
-        .sensors-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            width: 100%;
-            margin-top: auto;
-        }
-
-        .sensor-card {
-            background: rgba(255,255,255,0.05);
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-            transition: all 0.3s;
-        }
-
-        .sensor-card i { font-size: 1.5em; margin-bottom: 10px; color: #888; }
-        .sensor-card.active { background: rgba(233, 69, 96, 0.2); border: 1px solid var(--text-main); }
-        .sensor-card.active i { color: var(--text-main); animation: pulse 1s infinite; }
-
-        /* Logs */
-        .logs-card {
-            background-color: var(--panel-bg);
-            border-radius: 15px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            max-height: 100%;
-            overflow: hidden;
-        }
-
-        #log-list {
-            list-style: none;
-            padding: 0;
-            overflow-y: auto;
-            flex: 1;
-        }
-
-        #log-list li {
-            padding: 10px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            font-size: 0.9em;
-            display: flex;
-            justify-content: space-between;
-        }
-        #log-list li small { color: #888; }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-
-    </style>
+    
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <header>
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <i class="fas fa-traffic-light fa-2x" style="color: var(--text-main);"></i>
+        <div class="logo-area">
+            <i class="fas fa-city fa-2x" style="color: #ffcc00;"></i>
             <div>
-                <h1 style="margin: 0; font-size: 1.5em;">Sistema de Tráfego Inteligente</h1>
-                <small style="color: #888;">Painel de Controle e Monitoramento</small>
+                <h1>CTTU <span style="font-weight: 300;">| RECIFE</span></h1>
+                <small>Monitoramento de Tráfego em Tempo Real</small>
             </div>
         </div>
-        <div id="connection-status" class="status-badge status-offline">Desconectado</div>
+        <div id="mqtt-status" class="status-indicator">Iniciando...</div>
     </header>
 
-    <div class="main-grid">
-        <div class="intersection-card">
-            
-            <div class="traffic-light-container">
-                <div>
-                    <div class="street-label">Rua Principal</div>
-                    <div class="traffic-light" id="s1">
-                        <div class="light red" id="s1-r"></div>
-                        <div class="light yellow" id="s1-y"></div>
-                        <div class="light green" id="s1-g"></div>
+    <main>
+        <div class="content-left">
+            <section class="card report-panel">
+                <h3><i class="fas fa-brain"></i> Inteligência Operacional</h3>
+                <div class="report-grid">
+                    <div class="rep-item"><label>Retenção</label><span id="rep-retencao">0%</span></div>
+                    <div class="rep-item"><label>Pico</label><span id="rep-pico">--:--</span></div>
+                    <div class="rep-item"><label>Emergências</label><span id="rep-amb">0</span></div>
+                    <div class="rep-item"><label>Pedestres</label><span id="rep-ped">0</span></div>
+                </div>
+                <button onclick="exportToCSV()" class="btn-export">
+                    <i class="fas fa-file-download"></i> Exportar Dados (.CSV)
+                </button>
+            </section>
+
+            <section class="traffic-grid">
+                <div class="card road-card">
+                    <div class="road-name">AV. AGAMENON MAGALHÃES (S1)</div>
+                    <div class="traffic-ui">
+                        <div class="tl-box">
+                            <div id="s1-r" class="light red"></div>
+                            <div id="s1-y" class="light yellow"></div>
+                            <div id="s1-g" class="light green"></div>
+                        </div>
+                        <div class="flow-display">
+                            <small>STATUS</small>
+                            <div id="s1-status" class="status-text">--</div>
+                        </div>
                     </div>
                 </div>
 
-                <div>
-                    <div class="street-label">Cruzamento</div>
-                    <div class="traffic-light" id="s2">
-                        <div class="light red" id="s2-r"></div>
-                        <div class="light yellow" id="s2-y"></div>
-                        <div class="light green" id="s2-g"></div>
+                <div class="card road-card">
+                    <div class="road-name">RUA DO HOSPÍCIO (S2)</div>
+                    <div class="traffic-ui">
+                        <div class="tl-box">
+                            <div id="s2-r" class="light red"></div>
+                            <div id="s2-y" class="light yellow"></div>
+                            <div id="s2-g" class="light green"></div>
+                        </div>
+                        <div class="flow-display">
+                            <small>STATUS</small>
+                            <div id="s2-status" class="status-text">--</div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <div class="sensors-grid">
-                <div class="sensor-card" id="card-transito">
-                    <i class="fas fa-car"></i>
-                    <div>Fluxo</div>
-                    <strong id="val-transito">--</strong>
-                </div>
-                <div class="sensor-card" id="card-ambulancia">
-                    <i class="fas fa-ambulance"></i>
-                    <div>Prioridade</div>
-                    <strong id="val-ambulancia">Normal</strong>
-                </div>
-                <div class="sensor-card" id="card-pedestre">
-                    <i class="fas fa-walking"></i>
-                    <div>Pedestre</div>
-                    <strong id="val-pedestre">Não</strong>
-                </div>
-            </div>
-
+            <section class="card chart-container">
+                <canvas id="mainChart"></canvas>
+            </section>
         </div>
 
-        <div class="logs-card">
-            <h3><i class="fas fa-history"></i> Registro de Eventos</h3>
-            <ul id="log-list">
-                </ul>
-        </div>
-    </div>
+        <aside class="log-sidebar">
+            <div class="log-header">REGISTRO DE EVENTOS</div>
+            <ul id="log-list"></ul>
+        </aside>
+    </main>
 
-    <script>
-        // --- CONFIGURAÇÃO ---
-        const brokerOptions = {
-            username: 'user',      // Do .env
-            password: 'password',  // Do .env
-        };
-        const brokerUrl = 'ws://localhost:9001'; // Porta definida no Docker
-        
-        // Elementos DOM
-        const els = {
-            status: document.getElementById('connection-status'),
-            logList: document.getElementById('log-list'),
-            s1: { r: document.getElementById('s1-r'), y: document.getElementById('s1-y'), g: document.getElementById('s1-g') },
-            s2: { r: document.getElementById('s2-r'), y: document.getElementById('s2-y'), g: document.getElementById('s2-g') },
-            cards: {
-                transito: document.getElementById('card-transito'),
-                ambulancia: document.getElementById('card-ambulancia'),
-                pedestre: document.getElementById('card-pedestre')
-            },
-            vals: {
-                transito: document.getElementById('val-transito'),
-                ambulancia: document.getElementById('val-ambulancia'),
-                pedestre: document.getElementById('val-pedestre')
-            }
-        };
-
-        // Conexão MQTT
-        const client = mqtt.connect(brokerUrl, brokerOptions);
-
-        client.on('connect', () => {
-            console.log('Conectado ao Broker!');
-            els.status.textContent = 'Conectado - Monitorando';
-            els.status.className = 'status-badge status-online';
-            client.subscribe('teste/arduino');
-            addLog('Sistema', 'Conexão estabelecida com sucesso.');
-        });
-
-        client.on('error', (err) => {
-            console.error('Erro:', err);
-            els.status.textContent = 'Erro de Conexão';
-            els.status.className = 'status-badge status-offline';
-        });
-
-        client.on('message', (topic, message) => {
-            try {
-                // console.log(message.toString());
-                const data = JSON.parse(message.toString());
-                addLog('MQTT', `Mensagem recebida no tópico "${topic}": ${JSON.stringify(data)}`);
-                updateDashboard(data);
-            } catch (e) {
-                console.error('Erro ao parsear JSON', e);
-            }
-        });
-
-        // Lógica de Atualização da UI
-        function updateDashboard(data) {
-            // 1. Atualiza Semáforos
-            resetLights();
-            
-            switch(data.estado) {
-                case 'S1_VERDE': setLight('s1', 'g'); setLight('s2', 'r'); break;
-                case 'S1_AMARELO': setLight('s1', 'y'); setLight('s2', 'r'); break;
-                case 'S2_VERDE': setLight('s1', 'r'); setLight('s2', 'g'); break;
-                case 'S2_AMARELO': setLight('s1', 'r'); setLight('s2', 'y'); break;
-                // Casos de segurança (ambos vermelhos)
-                default: setLight('s1', 'r'); setLight('s2', 'r'); break;
-            }
-
-            // 2. Atualiza Cards de Sensores
-            
-            // Trânsito
-            els.vals.transito.textContent = data.transito;
-            if(data.transito === 'INTENSO') els.cards.transito.className = 'sensor-card active';
-            else els.cards.transito.className = 'sensor-card';
-
-            // Ambulância
-            if(data.ambulancia) {
-                els.vals.ambulancia.textContent = "DETECTADA!";
-                els.cards.ambulancia.classList.add('active');
-                addLog('Alerta', '🚑 Sirene detectada! Liberando via.');
-            } else {
-                els.vals.ambulancia.textContent = "Normal";
-                els.cards.ambulancia.classList.remove('active');
-            }
-
-            // Pedestre
-            if(data.pedestre) {
-                els.vals.pedestre.textContent = "Aguardando";
-                els.cards.pedestre.classList.add('active');
-            } else {
-                els.vals.pedestre.textContent = "Livre";
-                els.cards.pedestre.classList.remove('active');
-            }
-        }
-
-        // Helpers Visuais
-        function resetLights() {
-            Object.values(els.s1).forEach(l => l.classList.remove('active'));
-            Object.values(els.s2).forEach(l => l.classList.remove('active'));
-        }
-
-        function setLight(sem, color) {
-            // sem: 's1' ou 's2', color: 'r', 'y', 'g'
-            els[sem][color].classList.add('active');
-        }
-
-        function addLog(type, msg) {
-            const li = document.createElement('li');
-            const time = new Date().toLocaleTimeString();
-            li.innerHTML = `<span><strong>${type}:</strong> ${msg}</span> <small>${time}</small>`;
-            els.logList.prepend(li);
-            
-            // Limita histórico a 50 itens
-            if(els.logList.children.length > 50) els.logList.removeChild(els.logList.lastChild);
-        }
-
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
