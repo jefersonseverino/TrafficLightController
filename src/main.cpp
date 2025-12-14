@@ -257,7 +257,7 @@ void loop() {
         if (pedestreAtivo) {
             EstadoSinal proximoEstado = (ultimoVerde == S1_VERDE) ? S1_VERDE : S2_VERDE;
             Serial.printf("Pedestre recente em S%d. Mantém Verde.\n", (proximoEstado == S1_VERDE ? 1 : 2));
-            mudarPara(proximoEstado, true);
+            mudarPara(proximoEstado, false);
             pedestreAtivo = false;
             return;
         }
